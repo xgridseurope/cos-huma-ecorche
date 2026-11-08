@@ -4,7 +4,7 @@
 // depend on the camera aspect ratio or on how far the hand is from the camera.
 // Landmarks: 0 wrist · thumb 1-4 · index 5-8 · middle 9-12 · ring 13-16 · pinky 17-20.
 export const POSES = ['open', 'fist', 'pinch', 'neutral'];
-export const RECOGNIZER_VERSION = 'r1';
+export const RECOGNIZER_VERSION = 'r2';
 
 // Thresholds. Straightness = |MCP→TIP| / (|MCP→PIP| + |PIP→DIP| + |DIP→TIP|):
 // 1.0 for a straight finger, ~0.3 for a finger folded into a fist. It uses long distances,
@@ -17,6 +17,12 @@ export const TH = {
   pinchEnter: 0.30,   // thumb-tip–index-tip distance / palm length to enter pinch
   pinchExit: 0.42,    // ...and to leave it (hysteresis)
   openThumbGap: 0.45, // an open hand keeps thumb and index apart
+  openSpread: 0.33,   // r2: an open hand has spread fingers (mean adjacent fingertip gap / palm);
+                      //     a relaxed hand is nearly as straight but its fingers lie together (device 4080: rest p50 0.26)
+  pinchImgEnter: 0.18, // r2: thumb-tip–index-tip distance / palm length, measured on the IMAGE landmarks.
+  pinchImgExit: 0.24,  //     World landmarks put touching tips 0.5–0.9 palm apart (device 4080), the image does not.
+  pinchTipContact: 0.70, // r2: the thumb must be nearer the index TIP than the index DIP/PIP (ratio of the two);
+                         //     a relaxed thumb lies against the side of the index (device 4080: pinch p90 0.56, rest p50 0.70)
 };
 
 const sub = (a, b) => [a.x - b.x, a.y - b.y, (a.z || 0) - (b.z || 0)];
@@ -47,21 +53,29 @@ export function classify(hand, prev = 'neutral') {
   const bends = fingerBends(p), straight = fingerStraightness(p);
   const ext = straight.map((v) => v > TH.extended), curl = straight.map((v) => v < TH.curled);
   const nExt = ext.filter(Boolean).length, nCurl = curl.filter(Boolean).length;
-  const pinchRatio = dist(p, 4, 8) / palm;
-  const othersOpen = [ext[1], ext[2], ext[3]].filter(Boolean).length; // middle, ring, pinky
-  const pinchLimit = prev === 'pinch' ? TH.pinchExit : TH.pinchEnter;
+  const worldRatio = dist(p, 4, 8) / palm;
+  // r2: thumb–index contact is judged on the image landmarks when present (aspect-corrected 2D)
+  let tipContact = 0, pinchRatio = worldRatio, enter = TH.pinchEnter, exit = TH.pinchExit;
+  if (hand.image && hand.image.length === 21) {
+    const a = hand.aspect || 4 / 3, d2 = (i, j) => Math.hypot((hand.image[i].x - hand.image[j].x) * a, hand.image[i].y - hand.image[j].y);
+    const palm2 = Math.max(d2(0, 9), 1e-6);
+    pinchRatio = d2(4, 8) / palm2; enter = TH.pinchImgEnter; exit = TH.pinchImgExit;
+    tipContact = d2(4, 8) / Math.max(Math.min(d2(4, 7), d2(4, 6)), 1e-6);
+  }
+  const spread = (dist(p, 8, 12) + dist(p, 12, 16) + dist(p, 16, 20)) / 3 / palm;
+  const pinchLimit = prev === 'pinch' ? exit : enter;
   let pose = 'neutral';
-  // Pinch = thumb on index tip while the other fingers are NOT folded into a fist
-  // (this is what v1.4.0 got wrong: a fist also brings the thumb close to the index).
-  if (pinchRatio < pinchLimit && !curl[0] && othersOpen >= 2) pose = 'pinch';
+  // Pinch = thumb tip on index tip while the hand is NOT a fist (v1.4.0 confused the two: a fist
+  // also brings the thumb close to the index). r2: the other fingers may be relaxed, not only straight.
+  if (pinchRatio < pinchLimit && tipContact < TH.pinchTipContact && !curl[0] && nCurl < 3) pose = 'pinch';
   if (pose === 'neutral' && nCurl >= 3 && curl[0]) pose = 'fist';
   const meanStraight = straight.reduce((x, y) => x + y, 0) / 4;
-  if (pose === 'neutral' && nExt >= 3 && Math.min(...straight) > TH.openMin && meanStraight > TH.openMean && pinchRatio > TH.openThumbGap) pose = 'open';
+  if (pose === 'neutral' && nExt >= 3 && Math.min(...straight) > TH.openMin && meanStraight > TH.openMean && worldRatio > TH.openThumbGap && spread > TH.openSpread) pose = 'open';
   // confidence: how far the deciding measurements are from their thresholds (0..1)
   const margin = pose === 'open' ? (Math.min(...straight) - TH.openMin) / (1 - TH.openMin) * 0.5
     : pose === 'fist' ? Math.min(...straight.slice(0, 3).map((v) => (TH.curled - v) / TH.curled))
     : pose === 'pinch' ? (pinchLimit - pinchRatio) / pinchLimit : 0;
-  return { pose, confidence: Math.max(0, Math.min(1, 0.5 + margin)), features: { straight: straight.map((v) => +v.toFixed(2)), bends: bends.map((b) => Math.round(b)), pinchRatio: +pinchRatio.toFixed(3), nExt, nCurl } };
+  return { pose, confidence: Math.max(0, Math.min(1, 0.5 + margin)), features: { straight: straight.map((v) => +v.toFixed(2)), bends: bends.map((b) => Math.round(b)), pinchRatio: +pinchRatio.toFixed(3), spread: +spread.toFixed(3), nExt, nCurl } };
 }
 
 // MediaPipe handedness may refer to a mirrored or a non-mirrored picture depending on the

@@ -60,7 +60,9 @@ import { GesturePipeline, scoreTrials, PIPELINE_VERSION } from './gesture/pipeli
 const $ = (id) => document.getElementById(id);
 const CAL_KEY = 'cos_huma_b_hand_calibration';
 const LABEL = { open: '✋ 张手 · Mà oberta', fist: '✊ 握拳 · Puny', pinch: '👌 捏合 · Pinça', neutral: '〰 放松 · Relaxada' };
-const PROMPT = { open: '✋ Obre la mà · 张开手', fist: '✊ Tanca el puny · 握拳', pinch: '👌 Fes una pinça · 捏合', rest: '〰 Mà relaxada, sense gest · 放松，随便动' };
+const PROMPT = { open: '✋ Obre la mà · 张开手', fist: '✊ Tanca el puny · 握拳', pinch: '👌 Pinça: punta del polze amb punta de l’índex · 捏合：拇指尖碰食指尖', rest: '〰 Mà relaxada i quieta, sense gest · 手自然放松不动，不做任何手势' };
+// protocol v2: the prep countdown never names the next gesture, and the state machine is re-armed at performStart
+const PROTOCOL = { version: 'v2', prepShowsGesture: false, rearmAtPerformStart: true, prepMs: 1500, performMs: 3000, tailMs: 600 };
 const S = { tracker: null, stream: null, delegate: null, running: false, raf: 0, lastInfer: 0, lastVideoTime: -1, fps: 0, frames: 0, fpsT: 0,
   calibration: JSON.parse(localStorage.getItem(CAL_KEY) || 'null'), pipe: null, test: null, record: null, error: null, onFrame: null };
 S.pipe = new GesturePipeline({ swap: !!S.calibration?.swap });
@@ -125,6 +127,7 @@ async function startCamera() {
     }
     S.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } } });
     const v = $('video'); v.srcObject = S.stream; await v.play();
+    if (v.videoWidth && v.videoHeight) S.pipe.opts.aspect = v.videoWidth / v.videoHeight;   // image pinch distance is aspect-corrected
     S.running = true; S.lastVideoTime = -1; S.fpsT = performance.now(); S.pipe.reset(); log(`摄像头已启动（${S.delegate}）`);
     S.raf = requestAnimationFrame(loop); renderStatus(); return true;
   } catch (e) { S.error = String(e.message || e); log('启动失败：' + S.error); stopCamera(); renderStatus(); return false; }
@@ -179,9 +182,9 @@ $('runTest').onclick = async () => {
   for (let i = 0; i < seq.length && S.test; i++) {
     const exp = seq[i], tr = { index: i, expected: exp, frames: [], outputs: [], commands: [] };
     S.onFrame = (f, o) => { tr.frames.push(f); tr.outputs.push({ t: o.t, primary: o.primary, smState: o.smState, hands: o.hands.map((h) => ({ label: h.label, pose: h.pose, confidence: +h.confidence.toFixed(3) })) }); tr.commands.push(...o.commands.filter((c) => c.type !== 'GRAB_MOVE')); };
-    $('prompt').textContent = `${i + 1}/${seq.length} · 准备 Prepara't: ${PROMPT[exp]}`;
+    $('prompt').textContent = `${i + 1}/${seq.length} · 〰 Relaxa la mà · 先放松，等提示`;
     await waitUntil(performance.now() + 1500, (left) => { $('countdown').textContent = '先放松 ' + (left / 1000).toFixed(1) + ' s'; }, () => !!S.test);
-    tr.performStart = Math.round(performance.now()); $('prompt').textContent = `${i + 1}/${seq.length} · ${PROMPT[exp]}`;
+    tr.performStart = Math.round(performance.now()); S.pipe.rearm(); $('prompt').textContent = `${i + 1}/${seq.length} · ${PROMPT[exp]}`;
     await waitUntil(tr.performStart + 3000, (left) => { $('countdown').textContent = '保持 ' + (left / 1000).toFixed(1) + ' s'; }, () => !!S.test);
     tr.performEnd = Math.round(performance.now());
     await waitUntil(performance.now() + 600, null, () => !!S.test);   // late commands still count for this trial
@@ -198,7 +201,7 @@ $('runTest').onclick = async () => {
   const nFrames = trials.reduce((s, tr) => s + Math.max(0, tr.frames.length - 1), 0);
   const perf = { avgFps: span ? +(nFrames * 1000 / span).toFixed(1) : null, medianFps: q(0.5) ? +(1000 / q(0.5)).toFixed(1) : null, p10Fps: q(0.9) ? +(1000 / q(0.9)).toFixed(1) : null, frames: nFrames, delegate: S.delegate, video: { w: $('video').videoWidth, h: $('video').videoHeight } };
   S.record = { kind: 'cos-huma-gesture-record', created: new Date().toISOString(), who: $('who').value, device: $('device').value, ua: navigator.userAgent,
-    delegate: S.delegate, calibration: S.calibration, versions: S.pipe.versions, perf, score, trials };
+    delegate: S.delegate, calibration: S.calibration, versions: S.pipe.versions, protocol: PROTOCOL, perf, score, trials };
   showScore(score, $('result'), $('resultTable')); log('测试完成'); renderStatus();
 };
 function showScore(score, pre, tableEl) {
@@ -214,8 +217,9 @@ $('exportRec').onclick = () => {
 };
 // ---- replay: re-run a recording through the current pipeline and compare with the recorded result
 function replay(rec) {
-  const pipe = new GesturePipeline({ swap: !!rec.calibration?.swap, oneHand: rec.versions?.opts?.oneHand ?? true, smoothing: rec.versions?.opts?.smoothing ?? 0.5 });
-  const trials = rec.trials.map((tr) => { const outs = [], cmds = []; for (const f of tr.frames) { const o = pipe.process(f); outs.push({ t: o.t, primary: o.primary, hands: o.hands.map((h) => ({ label: h.label, pose: h.pose })) }); cmds.push(...o.commands.filter((c) => c.type !== 'GRAB_MOVE')); }
+  const pipe = new GesturePipeline({ swap: !!rec.calibration?.swap, oneHand: rec.versions?.opts?.oneHand ?? true, smoothing: rec.versions?.opts?.smoothing ?? 0.5, aspect: rec.perf?.video?.w && rec.perf?.video?.h ? rec.perf.video.w / rec.perf.video.h : 4 / 3 });
+  const rearm = rec.protocol?.rearmAtPerformStart === true;
+  const trials = rec.trials.map((tr) => { const outs = [], cmds = []; let armed = false; for (const f of tr.frames) { if (rearm && !armed && f.t >= tr.performStart) { pipe.rearm(); armed = true; } const o = pipe.process(f); outs.push({ t: o.t, primary: o.primary, hands: o.hands.map((h) => ({ label: h.label, pose: h.pose })) }); cmds.push(...o.commands.filter((c) => c.type !== 'GRAB_MOVE')); }
     return { expected: tr.expected, performStart: tr.performStart, performEnd: tr.performEnd, outputs: outs, commands: cmds }; });
   const score = scoreTrials(trials);
   return { score, identical: JSON.stringify(score.summary) === JSON.stringify(rec.score?.summary) };

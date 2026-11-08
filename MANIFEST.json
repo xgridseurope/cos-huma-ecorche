@@ -8,20 +8,20 @@
   "sha256": "127735a8150d0bb573c8319746f63e94a7dc986098774fb8c89d26249d9f9110"
  },
  "gesture/pipeline.js": {
-  "bytes": 5724,
-  "sha256": "0759dca9dec6d74ec495ba215b9e64a8f42016eef9285e44ea98652fb8f3da5b"
+  "bytes": 6580,
+  "sha256": "e3a62ed28a0a604d280e327a4e5732a6ee0711a2f53c2e611851af364bf692a1"
  },
  "gesture/recognizer.js": {
-  "bytes": 5519,
-  "sha256": "4e6bcbc97d4c41c5e3ae955f3d9b6cfd28dcf953c93191eb6117e620d488eb5c"
+  "bytes": 6886,
+  "sha256": "a268e8211656c7362299dbf5f06c414f07e0bfedb30a46919d11782b4d2a4f8e"
  },
  "gesture/state-machine.js": {
-  "bytes": 3450,
-  "sha256": "151e38725041ec7c5a93fd34c336b81ed0a4b2d8ebbcd77c2321af9688d714ba"
+  "bytes": 3688,
+  "sha256": "05a70a16da4d039893c9c66f70a184679305fb5b153295c8a7b582c071058b9c"
  },
  "gesture-lab.html": {
-  "bytes": 21099,
-  "sha256": "7f14ef3c403d2f9f323db0fc27ec1c8996d2de5cc032b4a992a46fb54462cf67"
+  "bytes": 21872,
+  "sha256": "b8e841177d560e6c8d23be6a4b07a6ed075288b87f39ccc74711940f9a308ccd"
  },
  "index.html": {
   "bytes": 8567625,

@@ -24,8 +24,8 @@
   "sha256": "b8e841177d560e6c8d23be6a4b07a6ed075288b87f39ccc74711940f9a308ccd"
  },
  "index.html": {
-  "bytes": 8567625,
-  "sha256": "d7b56e32f9cf6542a65f5240aedffe3396c253c4ccfb15310996e56408a6c6ba"
+  "bytes": 8570101,
+  "sha256": "fb07a09c3888476226232542bea6c174ff2b7cfd583e25770cda067b3be6112d"
  },
  "mediapipe/hand_landmarker.task": {
   "bytes": 7819105,

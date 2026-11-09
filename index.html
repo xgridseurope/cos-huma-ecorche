@@ -228,9 +228,51 @@ body.basic-question-active #emilySignature{opacity:.24}
 #emilyWelcome.ew .ew-answer[aria-pressed="true"]{background:#1B2A4A}
 #emilyWelcome.ew .ew-answer:focus-visible{outline:3px solid #F5B83D;outline-offset:3px}
 #emilyWelcome.ew .ew-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px 0 18px;font-size:13px;color:#6E6258}
+/* Phone + portrait tablet: one column, game first (title → hint → wall → found bones → cards → skip) */
+@media (max-width:1023px),(orientation:portrait) and (max-width:1199px){
+#emilyWelcome.ew .ew-wrap{padding:0 16px}
+#emilyWelcome.ew .ew-head{padding:12px 0 6px}
+#emilyWelcome.ew .ew-main{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:14px;padding:0 0 12px}
+#emilyWelcome.ew .ew-left,#emilyWelcome.ew .ew-right{display:contents}
+#emilyWelcome.ew .ew-left h2{order:1;font-size:clamp(34px,9vw,60px)}
+#emilyWelcome.ew .ew-sub{order:2;font-size:17px;max-width:none}
+#emilyWelcome.ew .ew-stage{order:3;align-self:center;width:min(100%,640px,calc((100svh - 190px) * 1.17))}
+#emilyWelcome.ew .ew-under{order:4}
+#emilyWelcome.ew .ew-found{order:5}
+#emilyWelcome.ew .ew-choose{order:6;margin:4px 0 0}
+#emilyWelcome.ew .ew-cards{order:7;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#emilyWelcome.ew .ew-skip{order:8}
+#emilyWelcome.ew .ew-card{min-height:0;padding:14px 12px;border-radius:18px}
+#emilyWelcome.ew .ew-card svg{width:26px;height:26px}
+#emilyWelcome.ew .ew-card b{font-size:18px}
+#emilyWelcome.ew .ew-card span{font-size:13px}
+#emilyWelcome.ew .ew-msg,#emilyWelcome.ew .ew-answer{font-size:17px}
+}
+@media (max-width:520px){
+#emilyWelcome.ew .ew-cards{grid-template-columns:1fr 1fr}
+#emilyWelcome.ew .ew-c1{grid-column:1 / -1}
+#emilyWelcome.ew .ew-word{font-size:22px}
+#emilyWelcome.ew .ew-app{font-size:15px;letter-spacing:1.5px}
+#emilyWelcome.ew .ew-slogan{font-size:13px}
+#emilyWelcome.ew .ew-chip{height:34px;padding:0 11px;font-size:14px}
+#emilyWelcome.ew .ew-under{gap:8px}
+#emilyWelcome.ew .ew-msg,#emilyWelcome.ew .ew-answer{font-size:16px;padding:9px 16px}
+}
 @media (prefers-reduced-motion:reduce){#emilyWelcome.ew .ew-msg,#emilyWelcome.ew .ew-card.pulse{animation:none}}
 #emilyWelcome.ew h2{margin:0}
 #emilyWelcome.ew p{margin:0;color:inherit;font-size:inherit;line-height:inherit}
+/* v1.5.0 phone/tablet layout (CSS only; no effect at >=1024px landscape desktop widths) */
+@media (max-width:1023px){
+header .brand{flex:1 1 auto;min-width:0}
+header .brand>div{min-width:0;overflow:hidden}
+header .brand h1,header .brand small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* the action bar used to keep its full width (~520px on a phone) and widened the whole page;
+   it now scrolls sideways inside the header instead */
+.headActions{flex:0 1 auto!important;min-width:0;max-width:64%;flex-wrap:nowrap!important;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.headActions::-webkit-scrollbar{display:none}
+.headActions>*{flex-shrink:0}
+#emilySignature{bottom:126px}
+}
 </style>
 <script type="importmap">{"imports":{"three":"./vendor/three/build/three.module.js","three/addons/":"./vendor/three/examples/jsm/"}}</script>
 <link href="./vendor/fonts/fonts.css" rel="stylesheet">
